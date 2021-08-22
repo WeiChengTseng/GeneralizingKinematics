@@ -11,7 +11,8 @@ from torch.autograd import Variable
 from torch.distributions import Categorical
 import math
 
-ONEOVERSQRT2PI = 1.0 / math.sqrt(2*math.pi)
+ONEOVERSQRT2PI = 1.0 / math.sqrt(2 * math.pi)
+
 
 class MDN(nn.Module):
     """A mixture density network layer
@@ -40,22 +41,19 @@ class MDN(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.num_gaussians = num_gaussians
-        self.n_hidden=n_hidden
-        self.z_h = nn.Sequential(
-            nn.Linear(in_features, n_hidden),
-            nn.Tanh()
-        )
+        self.n_hidden = n_hidden
+        self.z_h = nn.Sequential(nn.Linear(in_features, n_hidden), nn.Tanh())
         self.z_pi = nn.Linear(n_hidden, num_gaussians)
         self.z_sigma = nn.Sequential(
-            nn.Linear(n_hidden, num_gaussians*out_features),
+            nn.Linear(n_hidden, num_gaussians * out_features),
             # nn.Tanh(),
             nn.ELU())
-        self.z_mu = nn.Linear(n_hidden, num_gaussians*out_features)
+        self.z_mu = nn.Linear(n_hidden, num_gaussians * out_features)
 
-    def forward(self,x):
+    def forward(self, x):
         z_h = self.z_h(x)
         pi = nn.functional.softmax(self.z_pi(z_h), -1)
-        sigma=self.z_sigma(z_h)+1+1e-8
+        sigma = self.z_sigma(z_h) + 1 + 1e-8
         mu = self.z_mu(z_h)
         sigma = sigma.view(-1, self.num_gaussians, self.out_features)
         mu = mu.view(-1, self.num_gaussians, self.out_features)
@@ -80,8 +78,8 @@ def gaussian_probability(sigma, mu, data):
     """
     # print('data shape in gaussian_probability', data.shape)
     data = data.unsqueeze(1).expand_as(sigma)
-    ret = (ONEOVERSQRT2PI / sigma) * torch.exp(-0.5 * ( (data - mu) / sigma)**2 )
-    return torch.prod(ret,2)
+    ret = (ONEOVERSQRT2PI / sigma) * torch.exp(-0.5 * ((data - mu) / sigma)**2)
+    return torch.prod(ret, 2)
 
 
 def mdn_loss(pi, sigma, mu, target):
@@ -95,13 +93,15 @@ def mdn_loss(pi, sigma, mu, target):
     nll = -torch.log(torch.sum(prob, dim=1))
     return torch.mean(nll)
 
-def torch_gumbel(x,axis=1):
+
+def torch_gumbel(x, axis=1):
     loc = torch.tensor([0.0]).expand_as(x)
     scale = torch.tensor([1.0]).expand_as(x)
-    gumby=torch.distributions.gumbel.Gumbel(loc,scale)
-    z=gumby.sample().to(x.device)
+    gumby = torch.distributions.gumbel.Gumbel(loc, scale)
+    z = gumby.sample().to(x.device)
     indices = (torch.log(x) + z).argmax(dim=axis)
     return indices
+
 
 def sample(pi, sigma, mu):
     """
@@ -117,15 +117,17 @@ def sample(pi, sigma, mu):
     sampled = rn * sliced_sigma + sliced_mu
     return sampled
 
+
 def og_broken_sample(pi, sigma, mu):
     """Draw samples from a MoG.
     """
-    pi=torch.clamp(pi, 1e-8, 1.0)
+    pi = torch.clamp(pi, 1e-8, 1.0)
     categorical = Categorical(pi)
     pis = list(categorical.sample().data)
-    samples = Variable(sigma.data.new(sigma.size(0), sigma.size(2)).normal_()).to(sigma.device)
+    samples = Variable(sigma.data.new(
+        sigma.size(0), sigma.size(2)).normal_()).to(sigma.device)
     for i, idx in enumerate(pis):
-        samples[i] = samples[i] * sigma[i,idx] + mu[i,idx]
+        samples[i] = samples[i] * sigma[i, idx] + mu[i, idx]
     return samples
 
 
